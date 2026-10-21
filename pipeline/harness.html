@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>whale bake harness</title>
+<style>
+  /* the pet's fx particles are painted by class, and the classes live in the demo page's
+     CSS, not in the package. Without these, .tearf falls back to fill:black — a sad pet
+     bakes with black blobs all over her. Same values as examples/whale/index.html. */
+  .p-heart { stroke: #ff5c93; fill: #ffd0df; }
+  .p-dust { stroke: #9aa3c0; }
+  .eye { stroke: #3d6ee6; }
+  .tearf { fill: #8fd0ff; }
+  html,body{margin:0;padding:0;background:transparent;overflow:hidden}
+  #stage{position:relative;width:1600px;height:1600px;overflow:hidden;background:transparent}
+  #stageSvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+</style></head>
+<body>
+<div id="stage">
+  <svg id="stageSvg" xmlns="http://www.w3.org/2000/svg">
+    <ellipse id="shadow" class="shadow" cx="0" cy="0" rx="0" ry="0" fill="none"/>
+    <g id="pet"></g>
+    <g id="fx"></g>
+  </svg>
+</div>
+<script type="module">
+// Where the Coopanion package is served from. serve2.mjs roots at the parent of this
+// folder, so the default is the layout the baker was built against; ?pkg= overrides it
+// (bake2.mjs forwards HPKG from the environment) so the checkout can live anywhere.
+const PKG = new URLSearchParams(location.search).get('pkg') || '/coopanion-src/packages/cortico-world-desktop-pet';
+const { createPet } = await import(`${PKG}/web/kit/body.js`);
+const { createWhaleFigure } = await import(`${PKG}/web/whale/figure.js`);
+
+const W = 1600, H = 1600, FLOOR = 1200, S = 1.0;
+const q = new URLSearchParams(location.search);
+const scheme = q.get('scheme') || 'deepseek-maid';
+
+const figure = await createWhaleFigure(undefined, { scheme });
+const petG = document.getElementById('pet');
+const fxG  = document.getElementById('fx');
+const shadowEl = document.getElementById('shadow');
+
+const ctl = createPet(
+  { petG, shadowEl, fxG },
+  { figure, sfx: { play() {} }, roam: 'off', onEvent: () => {},
+    bounds: () => ({ W, H, floorY: FLOOR, S }) }
+);
+ctl.setRoam('off');
+ctl.resize();
+
+// keep the body over one fixed stage x so every captured frame shares one framing box
+function pin() { ctl.pet.x = W / 2; ctl.pet.vx = 0; }
+let T = 0;   // mirror of the kit's clock (see step)
+
+window.__bake = {
+  ready: true,
+  scheme: figure.scheme,
+  schemes: figure.schemes.map(s => s.id),
+
+  /* --- state setup. One page load per state (see bake2.mjs), so nothing leaks between rows. --- */
+  expr(id, sec) { ctl.holdRoam(1e6); ctl.setExpr(id, sec ?? 1e6); pin(); },
+  play(id)      { ctl.holdRoam(1e6); const r = ctl.doWord(id); pin(); return r; },
+  walk(dir, run){ ctl.holdRoam(1e6); ctl.walkTo(dir === 'left' ? W * 0.06 : W * 0.94, !!run, 0); pin(); },
+
+  /* --- determinism: the kit blinks and glances on Math.random(), which would bake a
+     different loop every run and pop at the wrap. Freeze both. --- */
+  freeze() {
+    ctl.pet.blinkT = 1e9; ctl.pet.blinkAge = 0;
+    ctl.pet.glanceAt = 1e9; ctl.pet.glance = [0, 0];
+    ctl.pet.look[0] = 0; ctl.pet.look[1] = 0;
+  },
+  /* stop the fx layer emitting (a tear every .8s never loops inside a 1.1s cell) */
+  noFx() { ctl.pet.emitAt = 1e9; },
+
+  // the kit's own clock: body.js does `T += dt` in step() and nothing else advances it,
+  // so mirroring the sum here gives the exact t the figure's sin(t*...) terms are driven by
+  step(dt) { T += dt; ctl.step(dt); pin(); ctl.render(); },
+  render() { pin(); ctl.render(); },
+  // resolve the face/pose once without moving the clock. step() is what turns pet.expr into
+  // pet._fc and what the figure mounts its canvas on; a row with no warm-up would otherwise
+  // photograph frame 0 with the *previous* face still in pet._fc (neutral, always).
+  flush() { ctl.step(1e-6); pin(); ctl.render(); },
+  modeT: () => ctl.pet.modeT,   // seconds since the current mode began
+  T: () => T,
+  clock: () => ({ mode: ctl.pet.mode, facing: ctl.pet.facing, expr: ctl.pet.expr, phase: ctl.pet.phase, speed: ctl.pet.speed }),
+};
+</script>
+</body></html>

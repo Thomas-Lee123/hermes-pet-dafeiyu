@@ -1,0 +1,10 @@
+{
+  "id": "dafeiyu",
+  "displayName": "大肥鱼",
+  "description": "从 Coopanion 的 DeepSeek Chan 形象包烘焙的鲸鱼娘：每个 agent 状态一条无缝循环，按各自动作周期取帧（走路 476ms 一步、跑 227ms、呼吸 2618ms、招手脉冲 1600ms、跳 ~1200ms）。",
+  "spritesheetPath": "spritesheet.png",
+  "spriteVersionNumber": 3,
+  "createdBy": "Pal AI Lab · Coopanion (DeepSeek Chan figure pack)",
+  "license": "AGPL-3.0-or-later",
+  "credit": "Pal-AI-Lab/Coopanion — baked to the Hermes petdex grid"
+}
